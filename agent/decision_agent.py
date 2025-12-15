@@ -3,7 +3,10 @@ import sys
 import json
 import urllib.request
 
+# --- Config ---
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+MODEL = "gpt-4o-mini"
+MAX_CHARS = 6000
 
 if not OPENAI_API_KEY:
     print("❌ OPENAI_API_KEY not set")
@@ -11,40 +14,59 @@ if not OPENAI_API_KEY:
 
 target_dir = sys.argv[1] if len(sys.argv) > 1 else "."
 
-def read_code_snippet(path, max_chars=4000):
+# --- Read code with exact line numbers ---
+def read_code_with_lines(path, max_chars=MAX_CHARS):
     content = ""
     for root, _, files in os.walk(path):
         for f in files:
             if f.endswith((".py", ".java")):
+                file_path = os.path.join(root, f)
+                content += f"\n### File: {f}\n"
                 try:
-                    with open(os.path.join(root, f), "r", errors="ignore") as file:
-                        content += f"\n### File: {f}\n"
-                        content += file.read(max_chars)
-                except:
+                    with open(file_path, "r", errors="ignore") as file:
+                        for idx, line in enumerate(file, start=1):
+                            content += f"{idx}: {line}"
+                            if len(content) >= max_chars:
+                                return content
+                except Exception:
                     pass
-    return content[:max_chars]
+    return content
 
-code = read_code_snippet(target_dir)
+code = read_code_with_lines(target_dir)
 
+# --- LLM Prompt ---
 prompt = f"""
-You are a CI code review agent.
-Scan the following code and answer ONLY with:
-- FAIL if there are critical issues
-- PASS if code looks acceptable
+You are an Agentic CI Code Reviewer.
+
+The code below INCLUDES EXACT LINE NUMBERS.
+Use them precisely.
+
+Respond STRICTLY in this format:
+
+DECISION: PASS or FAIL
+FINDINGS:
+- File: <filename>
+  Line: <exact line number>
+  Issue: <what is wrong>
+  Impact: <why it matters>
+
+Fail ONLY for real issues (bugs, security, correctness).
+Do NOT fail for formatting or style.
 
 Code:
 {code}
 """
 
 payload = {
-    "model": "gpt-4o-mini",
+    "model": MODEL,
     "messages": [
         {"role": "user", "content": prompt}
     ],
     "temperature": 0
 }
 
-req = urllib.request.Request(
+# --- Call OpenAI API (no SDK) ---
+request = urllib.request.Request(
     url="https://api.openai.com/v1/chat/completions",
     data=json.dumps(payload).encode("utf-8"),
     headers={
@@ -54,16 +76,21 @@ req = urllib.request.Request(
 )
 
 try:
-    with urllib.request.urlopen(req) as response:
+    with urllib.request.urlopen(request) as response:
         result = json.loads(response.read())
-        decision = result["choices"][0]["message"]["content"].strip()
+        reply = result["choices"][0]["message"]["content"]
 except Exception as e:
     print("❌ LLM call failed:", e)
     sys.exit(1)
 
-print(f"🤖 Agent decision: {decision}")
+# --- Output ---
+print("\n🤖 LLM RESPONSE")
+print("--------------------------------------------------")
+print(reply)
+print("--------------------------------------------------")
 
-if "FAIL" in decision.upper():
+# --- Enforce decision ---
+if "DECISION: FAIL" in reply.upper():
     sys.exit(1)
 
 sys.exit(0)
