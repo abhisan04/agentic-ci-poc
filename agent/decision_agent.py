@@ -1,38 +1,69 @@
-#!/usr/bin/env python3
 import os
 import sys
-import openai
+import json
+import urllib.request
 
-openai.api_key = os.getenv("OPENAI_API_KEY")  # set in Jenkins
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-def scan_code_llm(directory="."):
-    issues = []
-    for root, _, files in os.walk(directory):
-        for f in files:
-            if f.endswith(".py") or f.endswith(".java"):
-                path = os.path.join(root, f)
-                with open(path, "r", encoding="utf-8", errors="ignore") as file:
-                    code = file.read()
-                    prompt = f"Scan this code and return 'PASS' or 'FAIL' only:\n{code}"
-                    response = openai.ChatCompletion.create(
-                        model="gpt-3.5-turbo",
-                        messages=[{"role": "user", "content": prompt}],
-                        temperature=0
-                    )
-                    decision = response.choices[0].message.content.strip()
-                    if decision.upper() == "FAIL":
-                        issues.append(f"{path} flagged by LLM")
-    return issues
+if not OPENAI_API_KEY:
+    print("❌ OPENAI_API_KEY not set")
+    sys.exit(1)
 
 target_dir = sys.argv[1] if len(sys.argv) > 1 else "."
 
-issues = scan_code_llm(target_dir)
+def read_code_snippet(path, max_chars=4000):
+    content = ""
+    for root, _, files in os.walk(path):
+        for f in files:
+            if f.endswith((".py", ".java")):
+                try:
+                    with open(os.path.join(root, f), "r", errors="ignore") as file:
+                        content += f"\n### File: {f}\n"
+                        content += file.read(max_chars)
+                except:
+                    pass
+    return content[:max_chars]
 
-if issues:
-    print("[Agent] Issues found by LLM:")
-    for i in issues:
-        print(" -", i)
-    sys.exit(1)  # fail pipeline
-else:
-    print("[Agent] No issues ✅")
-    sys.exit(0)
+code = read_code_snippet(target_dir)
+
+prompt = f"""
+You are a CI code review agent.
+Scan the following code and answer ONLY with:
+- FAIL if there are critical issues
+- PASS if code looks acceptable
+
+Code:
+{code}
+"""
+
+payload = {
+    "model": "gpt-4o-mini",
+    "messages": [
+        {"role": "user", "content": prompt}
+    ],
+    "temperature": 0
+}
+
+req = urllib.request.Request(
+    url="https://api.openai.com/v1/chat/completions",
+    data=json.dumps(payload).encode("utf-8"),
+    headers={
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/json"
+    }
+)
+
+try:
+    with urllib.request.urlopen(req) as response:
+        result = json.loads(response.read())
+        decision = result["choices"][0]["message"]["content"].strip()
+except Exception as e:
+    print("❌ LLM call failed:", e)
+    sys.exit(1)
+
+print(f"🤖 Agent decision: {decision}")
+
+if "FAIL" in decision.upper():
+    sys.exit(1)
+
+sys.exit(0)
