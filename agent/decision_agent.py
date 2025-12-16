@@ -7,7 +7,7 @@ import subprocess  # 🔹 Added for git-tracked files
 # --- Config ---
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 MODEL = "gpt-4o-mini"
-MAX_CHARS = 6000
+MAX_CHARS = 20000  # 🔹 Increased to capture more code/issues
 
 if not OPENAI_API_KEY:
     print("❌ OPENAI_API_KEY not set")
@@ -67,6 +67,8 @@ FINDINGS:
   Line: <exact line number>
   Issue: <what is wrong>
   Impact: <why it matters>
+
+🔹 List ALL issues you find in the code. Do not stop at the first one.
 
 Fail ONLY for real issues (bugs, security, correctness).
 Do NOT fail for formatting or style.
