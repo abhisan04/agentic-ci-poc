@@ -14,11 +14,18 @@ if not OPENAI_API_KEY:
 
 target_dir = sys.argv[1] if len(sys.argv) > 1 else "."
 
+# 🔹 Identify this agent file to exclude
+AGENT_FILE = os.path.basename(__file__)
+
 # --- Read code with exact line numbers ---
 def read_code_with_lines(path, max_chars=MAX_CHARS):
     content = ""
     for root, _, files in os.walk(path):
         for f in files:
+            # 🔹 EXCLUDE decision_agent.py (self)
+            if f == AGENT_FILE:
+                continue
+
             if f.endswith((".py", ".java")):
                 file_path = os.path.join(root, f)
                 content += f"\n### File: {f}\n"
