@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import urllib.request
+import subprocess  # 🔹 Added for git-tracked files
 
 # --- Config ---
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -20,23 +21,33 @@ AGENT_FILE = os.path.basename(__file__)
 # --- Read code with exact line numbers ---
 def read_code_with_lines(path, max_chars=MAX_CHARS):
     content = ""
-    for root, _, files in os.walk(path):
-        for f in files:
-            # 🔹 EXCLUDE decision_agent.py (self)
-            if f == AGENT_FILE:
-                continue
 
-            if f.endswith((".py", ".java")):
-                file_path = os.path.join(root, f)
-                content += f"\n### File: {f}\n"
-                try:
-                    with open(file_path, "r", errors="ignore") as file:
-                        for idx, line in enumerate(file, start=1):
-                            content += f"{idx}: {line}"
-                            if len(content) >= max_chars:
-                                return content
-                except Exception:
-                    pass
+    try:
+        # 🔹 Get only Git-tracked files
+        files = subprocess.check_output(
+            ["git", "ls-files"],
+            cwd=path,
+            text=True
+        ).splitlines()
+    except Exception:
+        return content
+
+    for f in files:
+        # 🔹 Exclude this agent file itself
+        if f == AGENT_FILE:
+            continue
+
+        if f.endswith((".py", ".java")):
+            content += f"\n### File: {f}\n"
+            try:
+                with open(os.path.join(path, f), "r", errors="ignore") as file:
+                    for idx, line in enumerate(file, start=1):
+                        content += f"{idx}: {line}"
+                        if len(content) >= max_chars:
+                            return content
+            except Exception:
+                pass
+
     return content
 
 code = read_code_with_lines(target_dir)
