@@ -1,16 +1,23 @@
 import json
 import subprocess
 import sys
+import os  # 🔹 added for path handling
 
+# --- Helper ---
 def is_blocking(signal):
     """Returns True if the signal indicates HIGH severity failure"""
     return signal.get("decision") == "FAIL" and signal.get("severity") == "HIGH"
 
+# --- Base directory (where this file lives) ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 def run_static_agent():
     """Run LLM-based static agent and return parsed JSON"""
     print("🧠 Running Static LLM Agent...")
+    static_path = os.path.join(BASE_DIR, "static_agent.py")
+    repo_root = os.path.join(BASE_DIR, "../..")  # adjust to pass repo root
     output = subprocess.check_output(
-        ["python3", "static_agent.py", "."],
+        ["python3", static_path, repo_root],
         text=True
     )
     return json.loads(output)
@@ -18,8 +25,9 @@ def run_static_agent():
 def run_dynamic_agent():
     """Run dynamic agent and return parsed JSON"""
     print("⚙️ Running Dynamic Agent...")
+    dynamic_path = os.path.join(BASE_DIR, "dynamic_agent.py")
     output = subprocess.check_output(
-        ["python3", "dynamic_agent.py"],
+        ["python3", dynamic_path],
         text=True
     )
     return json.loads(output)
