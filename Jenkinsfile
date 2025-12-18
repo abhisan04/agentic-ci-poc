@@ -1,14 +1,6 @@
 pipeline {
     agent any
 
-    environment {
-        AGENT_SIGNAL = "${params.SIGNAL}"
-    }
-
-    parameters {
-        choice(name: 'SIGNAL', choices: ['pass', 'fail'], description: 'Agent input')
-    }
-
     stages {
         stage('Checkout') {
             steps {
@@ -16,11 +8,20 @@ pipeline {
             }
         }
 
-        stage('Agent Decision') {
+        stage('Run Meta-Agent') {
             steps {
-                sh '''
-                  python3 agent/decision_agent.py
-                '''
+                // Run meta-agent: it internally calls static & dynamic agents as needed
+                sh 'python3 agent/meta_agent.py > agent_result.json'
+
+                script {
+                    def result = readJSON file: 'agent_result.json'
+                    echo "Agent Result: ${result}"
+
+                    // Pipeline only enforces final decision
+                    if (result.final_decision == 'FAIL') {
+                        error("Pipeline blocked by agent: ${result.action}")
+                    }
+                }
             }
         }
 
