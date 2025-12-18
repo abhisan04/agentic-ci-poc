@@ -11,10 +11,6 @@ def is_blocking(signal):
 # --- Base directory (where this file lives) ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# --- Temp result file paths ---
-STATIC_RESULT_FILE = os.path.join(BASE_DIR, "static_result.json")
-DYNAMIC_RESULT_FILE = os.path.join(BASE_DIR, "dynamic_result.json")
-
 def run_static_agent():
     """Run LLM-based static agent and return parsed JSON"""
     print("\n🧠 Running Static LLM Agent...")
@@ -22,20 +18,23 @@ def run_static_agent():
     repo_root = os.path.join(BASE_DIR, "../..")
 
     try:
-        subprocess.run(
+        # Capture stdout so we can parse JSON
+        output = subprocess.check_output(
             ["python3", static_path, repo_root],
-            check=True,
             text=True,
-            stdout=sys.stdout,
-            stderr=sys.stderr
+            stderr=subprocess.STDOUT
         )
-        # Read JSON output from temp file
-        with open(STATIC_RESULT_FILE) as f:
-            result = json.load(f)
+        print(f"Static agent raw output:\n{output}")
+        result = json.loads(output)
         print(f"✅ Static Agent Decision: {result.get('decision')} | Severity: {result.get('severity')}")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Static Agent subprocess failed: {e.output}")
+        result = {"decision": "FAIL", "severity": "HIGH",
+                  "issues": [{"file": "static_agent.py", "line": "N/A", "issue": "Subprocess failed", "impact": e.output}]}
     except Exception as e:
-        print(f"❌ Static Agent failed: {e}")
-        result = {"decision": "FAIL", "severity": "HIGH", "issues": [{"file": "static_agent.py", "line": "N/A", "issue": "Subprocess failed", "impact": str(e)}]}
+        print(f"❌ Static Agent unexpected error: {e}")
+        result = {"decision": "FAIL", "severity": "HIGH",
+                  "issues": [{"file": "static_agent.py", "line": "N/A", "issue": "Unexpected error", "impact": str(e)}]}
 
     return result
 
@@ -45,20 +44,20 @@ def run_dynamic_agent():
     dynamic_path = os.path.join(BASE_DIR, "dynamic_agent.py")
 
     try:
-        subprocess.run(
+        output = subprocess.check_output(
             ["python3", dynamic_path],
-            check=True,
             text=True,
-            stdout=sys.stdout,
-            stderr=sys.stderr
+            stderr=subprocess.STDOUT
         )
-        # Read JSON output from temp file
-        with open(DYNAMIC_RESULT_FILE) as f:
-            result = json.load(f)
+        print(f"Dynamic agent raw output:\n{output}")
+        result = json.loads(output)
         print(f"✅ Dynamic Agent Decision: {result.get('decision')} | Severity: {result.get('severity')}")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Dynamic Agent subprocess failed: {e.output}")
+        result = {"decision": "FAIL", "severity": "HIGH", "observations": [{"issue": "Subprocess failed", "impact": e.output}]}
     except Exception as e:
-        print(f"❌ Dynamic Agent failed: {e}")
-        result = {"decision": "FAIL", "severity": "HIGH", "observations": [{"issue": "Subprocess failed", "impact": str(e)}]}
+        print(f"❌ Dynamic Agent unexpected error: {e}")
+        result = {"decision": "FAIL", "severity": "HIGH", "observations": [{"issue": "Unexpected error", "impact": str(e)}]}
 
     return result
 
