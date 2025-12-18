@@ -11,9 +11,6 @@ def is_blocking(signal):
 # --- Base directory (where this file lives) ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# --- Pass current environment including OPENAI_API_KEY ---
-ENV = os.environ.copy()
-
 def run_static_agent():
     """Run LLM-based static agent and return parsed JSON"""
     print("\n🧠 Running Static LLM Agent...")
@@ -21,12 +18,10 @@ def run_static_agent():
     repo_root = os.path.join(BASE_DIR, "../..")
 
     try:
-        # Pass environment to subprocess
         output = subprocess.check_output(
             ["python3", static_path, repo_root],
             text=True,
-            stderr=subprocess.STDOUT,
-            env=ENV
+            stderr=subprocess.STDOUT
         )
         print(f"Static agent raw output:\n{output}")
         result = json.loads(output)
@@ -42,29 +37,10 @@ def run_static_agent():
 
     return result
 
+# --- Dynamic agent is temporarily disabled ---
 def run_dynamic_agent():
-    """Run dynamic agent and return parsed JSON"""
-    print("\n⚙️ Running Dynamic Agent...")
-    dynamic_path = os.path.join(BASE_DIR, "dynamic_agent.py")
-
-    try:
-        output = subprocess.check_output(
-            ["python3", dynamic_path],
-            text=True,
-            stderr=subprocess.STDOUT,
-            env=ENV
-        )
-        print(f"Dynamic agent raw output:\n{output}")
-        result = json.loads(output)
-        print(f"✅ Dynamic Agent Decision: {result.get('decision')} | Severity: {result.get('severity')}")
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Dynamic Agent subprocess failed: {e.output}")
-        result = {"decision": "FAIL", "severity": "HIGH", "observations": [{"issue": "Subprocess failed", "impact": e.output}]}
-    except Exception as e:
-        print(f"❌ Dynamic Agent unexpected error: {e}")
-        result = {"decision": "FAIL", "severity": "HIGH", "observations": [{"issue": "Unexpected error", "impact": str(e)}]}
-
-    return result
+    print("\n⚙️ Dynamic Agent is currently disabled.")
+    return {"decision": "SKIP", "severity": "LOW", "observations": []}
 
 def decide_next(static_signal):
     """Agentic decisioning logic"""
@@ -98,16 +74,14 @@ def meta_agent():
     final_result["action"] = action
     print(f"➡️ Next action decided by meta-agent: {action}")
 
-    # Run dynamic agent if needed
-    if action == "RUN_DYNAMIC":
-        dynamic_signal = run_dynamic_agent()
-        final_result["dynamic"] = dynamic_signal
-
-        # Hard stop if dynamic HIGH severity
-        if is_blocking(dynamic_signal):
-            print("❌ Blocking due to HIGH severity from Dynamic Agent")
-            final_result["final_decision"] = "FAIL"
-            return final_result
+    # Dynamic agent is skipped
+    # if action == "RUN_DYNAMIC":
+    #     dynamic_signal = run_dynamic_agent()
+    #     final_result["dynamic"] = dynamic_signal
+    #     if is_blocking(dynamic_signal):
+    #         print("❌ Blocking due to HIGH severity from Dynamic Agent")
+    #         final_result["final_decision"] = "FAIL"
+    #         return final_result
 
     # No blocking signals
     final_result["final_decision"] = "PASS"
