@@ -11,6 +11,9 @@ def is_blocking(signal):
 # --- Base directory (where this file lives) ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# --- Pass current environment including OPENAI_API_KEY ---
+ENV = os.environ.copy()
+
 def run_static_agent():
     """Run LLM-based static agent and return parsed JSON"""
     print("\n🧠 Running Static LLM Agent...")
@@ -18,11 +21,12 @@ def run_static_agent():
     repo_root = os.path.join(BASE_DIR, "../..")
 
     try:
-        # Capture stdout so we can parse JSON
+        # Pass environment to subprocess
         output = subprocess.check_output(
             ["python3", static_path, repo_root],
             text=True,
-            stderr=subprocess.STDOUT
+            stderr=subprocess.STDOUT,
+            env=ENV
         )
         print(f"Static agent raw output:\n{output}")
         result = json.loads(output)
@@ -47,7 +51,8 @@ def run_dynamic_agent():
         output = subprocess.check_output(
             ["python3", dynamic_path],
             text=True,
-            stderr=subprocess.STDOUT
+            stderr=subprocess.STDOUT,
+            env=ENV
         )
         print(f"Dynamic agent raw output:\n{output}")
         result = json.loads(output)
