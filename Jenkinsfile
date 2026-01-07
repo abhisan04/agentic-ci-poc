@@ -21,7 +21,7 @@ pipeline {
         stage('Setup Python Env') {
             steps {
                 sh '''
-                  python -m venv .venv
+                  python3 -m venv .venv
                   . .venv/bin/activate
                   pip install --upgrade pip
                   pip install -r requirements.txt
@@ -36,7 +36,7 @@ pipeline {
 
                   echo "Running agent self-validation with strict exclusions"
 
-                  python run_scan.py \
+                  python3 run_scan.py \
                     --target ./src \
                     --exclude agent,agentic,.git,.venv,node_modules,tests
                 '''
@@ -47,7 +47,7 @@ pipeline {
             steps {
                 sh '''
                   . .venv/bin/activate
-                  python -c "import agent; print('Agent loaded successfully')"
+                  python3 -c "import agent; print('Agent loaded successfully')"
                 '''
             }
         }
