@@ -1,34 +1,64 @@
 pipeline {
     agent any
 
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+    }
+
+    environment {
+        PYTHONUNBUFFERED = '1'
+    }
+
     stages {
+
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Run Meta-Agent') {
+        stage('Setup Python Env') {
             steps {
-                // Run meta-agent: it internally calls static & dynamic agents as needed
-                sh 'python3 agent/meta_agent.py > agent_result.json'
-
-                script {
-                    def result = readJSON file: 'agent_result.json'
-                    echo "Agent Result: ${result}"
-
-                    // Pipeline only enforces final decision
-                    if (result.final_decision == 'FAIL') {
-                        error("Pipeline blocked by agent: ${result.action}")
-                    }
-                }
+                sh '''
+                  python -m venv .venv
+                  . .venv/bin/activate
+                  pip install --upgrade pip
+                  pip install -r requirements.txt
+                '''
             }
         }
 
-        stage('Post-Agent Stage') {
+        stage('Agent Self-Validation (NO SELF SCAN)') {
             steps {
-                echo "Agent allowed pipeline to continue 🚀"
+                sh '''
+                  . .venv/bin/activate
+
+                  echo "Running agent self-validation with strict exclusions"
+
+                  python run_scan.py \
+                    --target ./src \
+                    --exclude agent,agentic,.git,.venv,node_modules,tests
+                '''
             }
+        }
+
+        stage('Agent Health Check') {
+            steps {
+                sh '''
+                  . .venv/bin/activate
+                  python -c "import agent; print('Agent loaded successfully')"
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "Agentic CI completed (informational only)"
+        }
+        failure {
+            echo "Agent CI failed – investigate agent stability (not target app quality)"
         }
     }
 }
